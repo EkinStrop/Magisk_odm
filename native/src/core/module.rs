@@ -40,6 +40,32 @@ macro_rules! module_log {
     }
 }
 
+fn remap_system_path_to_partition(path: &Utf8CStr) -> Option<Utf8CString> {
+    let remap = |prefix: &str, replacement: &str| {
+        if path == prefix {
+            Some(Utf8CString::from(replacement))
+        } else {
+            path.strip_prefix(prefix)
+                .and_then(|rest| rest.strip_prefix('/'))
+                .map(|rest| Utf8CString::from(format!("{replacement}/{rest}")))
+        }
+    };
+
+    remap("/system/vendor", "/vendor")
+        .or_else(|| remap("/system/odm", "/odm"))
+        .or_else(|| remap("/system/product", "/product"))
+        .or_else(|| remap("/system/system_ext", "/system_ext"))
+}
+
+fn find_attr_source(path: &Utf8CStr) -> Option<Utf8CString> {
+    if let Some(remapped) = remap_system_path_to_partition(path)
+        && remapped.exists()
+    {
+        return Some(remapped);
+    }
+    path.exists().then(|| path.to_owned())
+}
+
 #[allow(unused_variables)]
 fn bind_mount(reason: &str, src: &Utf8CStr, dest: &Utf8CStr, rec: bool) {
     module_log!(reason, dest, src);
@@ -249,8 +275,8 @@ impl FsNode {
                         continue;
                     }
                 }
-                if entry_paths.real().exists() {
-                    clone_attr(entry_paths.real(), path)?;
+                if let Some(src) = find_attr_source(entry_paths.real()) {
+                    clone_attr(&src, path)?;
                 }
                 children
                     .entry(entry.name().to_string())
