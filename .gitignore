@@ -1,0 +1,16 @@
+out
+.gradle
+*.zip
+*.jks
+*.apk
+*.log
+/config.prop
+/notes.md
+/app/gradle/gradle-daemon-jvm.properties
+
+# Built binaries
+native/out
+
+# Android Studio
+*.iml
+.idea
